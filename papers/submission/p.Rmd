@@ -20,10 +20,10 @@ affiliation:
     institution   : "University of California, Irvine"
 
 author_note: |
-    This paper was written in R-Markdown. In R-Markdown, the text and the code for analysis may be included in a single document.  The document for this paper, with all text and code, may be found at xxxx.
+    This paper was written in R-Markdown. In R-Markdown, the text and the code for analysis may be included in a single document.  The document for this paper, with all text and code, may be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe).
     
 abstract: |
-    Item ordering refers to the statement that if one item is harder than another for one person, then it is harder for all people. Whether item ordering holds or not is a psychological statement because it describes how people may qualitatively vary. Yet, modern item response theory (IRT) make an a priori commitment to item ordering, such as in the Rasch model where items have to order, or, contrastingly, in the 2PL model, where items cannot order. Needed is an IRT model item ordering or its violation is a function of the data rather than an a priori commitment. We develop a two-parameter shifted-exponential model for this purpose. We show how item ordering may be assessed and discuss computational issues with shift-scale IRT models.
+    Item ordering refers to the statement that if one item is harder than another for one person, then it is harder for all people. Whether item ordering holds or not is a psychological statement because it describes how people may qualitatively vary. Yet, modern item response theory (IRT) make an a priori commitment to item ordering, such as in the Rasch model where items have to order, or, conversely, in the 2PL model, where items cannot order. Needed is an IRT model item ordering or its violation is a function of the data rather than an a priori commitment. We develop a two-parameter shifted-exponential model for this purpose. We show how item ordering may be assessed and discuss computational issues with shift-scale IRT models.
   
 keywords          : "Item Ordering, 2PL, Item response theory"
 
@@ -44,7 +44,7 @@ footnotelist      : no
 lineno            : no
 
 lang              : "english"
-class             : "man"
+class             : "jou"
 output            : papaja::apa6_pdf
 csl               : apa6.csl
 ---
@@ -202,7 +202,7 @@ p(\bftheta,\bfalpha,\bfbeta | \bfY) \propto & \prod_{i}\prod_{j}\big[ 1 - \exp(-
 \end{equation}
 where $\phi$ is the normal density and $f$ is the density on an inverse gamma with shape $c_3$ and scale $c_4$.  
 
-We initially derived conditional posteriors and implemented a MCMC chain with Metropolis Hasting sampling of each parameter.  Yet, we were unable to achieve good mixing  with this approach.  The problem is obvious; the shift and scale parameters are too interdependent.  A large increase in shift and a corresponding decrease in scale results in likelihoods that change little.  One way of obtaining chains that mix well is to use an alternative sampler that tracks well ridges in the likelihood.  We chose the `stan` package [@rstan:2018], which uses Hamiltonian sampling and is ideal for this application.  The `R` code is integrated into this manuscript and can be found at xxxxx. 
+We initially derived conditional posteriors and implemented a MCMC chain with Metropolis Hasting sampling of each parameter.  Yet, we were unable to achieve good mixing  with this approach.  The problem is obvious; the shift and scale parameters are too interdependent.  A large increase in shift and a corresponding decrease in scale results in likelihoods that change little.  One way of obtaining chains that mix well is to use an alternative sampler that tracks well ridges in the likelihood.  We chose the `stan` package [@rstan:2018], which uses Hamiltonian sampling and is ideal for this application.  The `R` code is integrated into this manuscript and can be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe). 
 
 
 # Applications
