@@ -23,7 +23,7 @@ author_note: |
     This paper was written in R-Markdown. In R-Markdown, the text and the code for analysis may be included in a single document.  The document for this paper, with all text and code, may be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe).
     
 abstract: |
-    Item ordering refers to the statement that if one item is harder than another for one person, then it is harder for all people. Whether item ordering holds or not is a psychological statement because it describes how people may qualitatively vary. Yet, modern item response theory (IRT) make an a priori commitment to item ordering, such as in the Rasch model where items have to order, or, conversely, in the 2PL model, where items cannot order. Needed is an IRT model item ordering or its violation is a function of the data rather than an a priori commitment. We develop a two-parameter shifted-exponential model for this purpose. We show how item ordering may be assessed and discuss computational issues with shift-scale IRT models.
+    Item ordering refers to the statement that if one item is harder than another for one person, then it is harder for all people. Whether item ordering holds or not is a psychological statement because it describes how people may qualitatively vary. Yet, modern item response theory (IRT) makes an a priori commitment to item ordering, such as in the Rasch model where items have to order, or, conversely, in the 2PL model, where items cannot order. Needed is an IRT model where item ordering or its violation is a function of the data rather than an a priori commitment. We develop a two-parameter shifted-exponential model for this purpose. We show how item ordering may be assessed and discuss computational issues with shift-scale IRT models.
   
 keywords          : "Item Ordering, 2PL, Item response theory"
 
@@ -42,6 +42,7 @@ figurelist        : no
 tablelist         : no
 footnotelist      : no
 lineno            : no
+mask              : true
 
 lang              : "english"
 class             : "jou"
@@ -190,7 +191,7 @@ The priors for the item parameters are
 \beta_i &\stackrel{iid}{\sim} \mbox{Inverse Gamma}(c_3, c_4),\\
 \end{aligned}
 \]
-where $(c_1,\ldots,c_4)$ are prior settings that need to be set before data analysis.  We use the following settings in  application: $c_1=-1$, $c_2=10^2$, $c_3=c_4=1$, and the resulting priors are quite broad and only weakly informative.
+where $(c_1,\ldots,c_4)$ are prior parameters that need to be set before data analysis.  We use the following settings in  application: $c_1=-1$, $c_2=10^2$, $c_3=c_4=1$, and the resulting priors are quite broad and only weakly informative.
 
 The resulting joint posterior for the parameters is:
 
@@ -202,7 +203,7 @@ p(\bftheta,\bfalpha,\bfbeta | \bfY) \propto & \prod_{i}\prod_{j}\big[ 1 - \exp(-
 \end{equation}
 where $\phi$ is the normal density and $f$ is the density on an inverse gamma with shape $c_3$ and scale $c_4$.  
 
-We initially derived conditional posteriors and implemented a MCMC chain with Metropolis Hasting sampling of each parameter.  Yet, we were unable to achieve good mixing  with this approach.  The problem is obvious; the shift and scale parameters are too interdependent.  A large increase in shift and a corresponding decrease in scale results in likelihoods that change little.  One way of obtaining chains that mix well is to use an alternative sampler that tracks well ridges in the likelihood.  We chose the `stan` package [@rstan:2018], which uses Hamiltonian sampling and is ideal for this application.  The `R` code is integrated into this manuscript and can be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe). 
+We initially derived conditional posteriors and implemented a MCMC chain with Metropolis Hasting sampling of each parameter.  Yet, we were unable to achieve good mixing  with this approach.  The problem is obvious; the shift and scale parameters are too interdependent.  A large increase in shift and a corresponding decrease in scale results in likelihoods that change little.  One way of obtaining chains that mix well is to use an alternative sampler that better handles ridges in the likelihood.  We chose the `Stan` package [@rstan:2018], which uses Hamiltonian sampling and is ideal for this application.  The `R` code is integrated into this manuscript and can be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe). 
 
 
 # Applications
@@ -211,11 +212,11 @@ To assess whether item ordering holds in common IRT applications, we reanalyzed 
 
 ## LSAT-6 
 
-The LSAT-6 data set, from @Thissen:1982, consists of the responses of one-thousand individuals to five dichotomously scored items from the Law School Admissions Test, Section 6.  To examine mixing, we ran a single chain for 800 iterations, the first 200 of which served as a burn-in.  The quality of mixing was assessed by inspection of chains and by the effective samples statistic.  Figure\ \ref{fig:chain} shows the trace plots, and each plot is for an item.  The two traces are for the two item parameter shift ($\alpha_i$) and scale ($\beta_i$).   The left plot is for the item that mixed best; the right plot is for the one that mixed worst.     As can be seen, mixing, while not particular good, is sufficient.  The effective sample sizes [@Ripley:1979] at worst are 1/10 the nominal values, and obtaining hundreds or thousands of samples is not particularly time consuming.  Hence, posterior distributions may be estimated to a reasonable degree of confidence.  JEFF, FIX FIG.
+The LSAT-6 data set, from @Thissen:1982, consists of the responses of one-thousand individuals to five dichotomously scored items from the Law School Admissions Test, Section 6.  To examine mixing, we ran a single chain for 800 iterations, the first 200 of which served as a burn-in.  The quality of mixing was assessed by inspection of chains and by the effective samples statistic.  Figure\ \ref{fig:chain} shows the trace plots, and each plot is for an item.  The two traces are for the two item parameter shift ($\alpha_i$) and scale ($\beta_i$).   The left plot is for the item that mixed best; the right plot is for the one that mixed worst.     As can be seen, mixing, while not particularly good, is sufficient.  The effective sample sizes [@Ripley:1979] at worst are 1/10 the nominal values, and obtaining hundreds or thousands of samples is not particularly time consuming.  Hence, posterior distributions may be estimated to a reasonable degree of confidence.
 
 Figure\ \ref{fig:LSAT6}A shows the bivariate posterior samples for all item parameters.  There are five clouds, with one cloud for each item in the set.  Here we see that item ordering may hold.  Overall, it seems that Item A has the smallest shift and scale, and the remaining items increase in shift while maintaining about the same scale. 
 <!-- \readme{is it useful to count the proportion of posterior draws that exhibit this parameter ordering, even if that proportion is not explicitly tied to a bayes factor?} -->
-The bivariate posterior mean for each item is located by the letter, and the corresponding item-response curves from these posterior means are shown in Figure\ \ref{fig:LSAT6}B.  As can be seen, the item ordering is plausible over a reasonable range of abilities.  JEFF, ADD COLORS TO ITEM RESPONSE CURVES
+The bivariate posterior mean for each item is located by the letter, and the corresponding item-response curves from these posterior means are shown in Figure\ \ref{fig:LSAT6}B.  As can be seen, the item ordering is plausible over a reasonable range of abilities.
 
 Although the 2PE model is helpful for assessing item ordering, it has difficult statistical properties.  The bivariate posterior distribution is highly correlated, and this correlation reflects long ridges in the likelihood.   Such ridges necessitate care in evaluating posterior distributions as parameters are only weakly identifiable.
 
@@ -318,7 +319,9 @@ myPlotLog=function(fit,c.alpha=.2,cex=.7){
   z=seq(-7,7,.01)
   plot(z,pexGAUS(z,mu=ma[1],sigma=1,nu=mb[1]),
        typ='n',ylim=c(0,1),
-       xlab="Ability",ylab="Probability")
+       xlab="Ability",ylab="Probability"
+       , xaxt = "n")
+  axis(1, seq(-6, 6, 3))
   for (i in 1:length(ma)) 
     lines(z,pexGAUS(z,mu=ma[i],sigma=1,nu=mb[i]), col = newcols[i], lwd = 2)
   mtext(side=3,adj=0,line=0,"B.",cex=1.4)
@@ -349,7 +352,9 @@ myPlot=function(fit,c.alpha=.2,cex=.7){
   z=seq(-7,7,.01)
   plot(z,pexGAUS(z,mu=ma[1],sigma=1,nu=mb[1]),
        typ='n',ylim=c(0,1),
-       xlab="Ability",ylab="Probability")
+       xlab="Ability",ylab="Probability"
+       , xaxt = "n")
+  axis(1, seq(-6, 6, 3))
   for (i in 1:length(ma)) 
     lines(z,pexGAUS(z,mu=ma[i],sigma=1,nu=mb[i]), col = newcols[i], lwd = 2)
   mtext(side=3,adj=0,line=0,"B.",cex=1.4)
@@ -357,11 +362,23 @@ myPlot=function(fit,c.alpha=.2,cex=.7){
 ```
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE}
-plotChain=function(fit,item){
+plotChain <- function(fit,item, leg = F){
   vals=as.matrix(fit)
   a=vals[,colnames(vals) %like% "alpha"]
   b=vals[,colnames(vals) %like% "beta"]
-  matplot(cbind(a[,item],b[,item]),typ='l',lty=1:2,col='black',xlab="Iteration",ylab="Value")
+  matplot(cbind(a[,item],b[,item])
+          ,typ='l',lty=1:2,col='black'
+          ,xlab="Iteration",ylab="Value", xaxt = "n")
+  axis(1, at = seq(0, 600, 200))
+  if(leg == T){
+    legend("bottomleft"
+           , legend = c(expression("Shift" ~ alpha)
+                        , expression("Scale" ~ beta))
+           , lty = 1:2
+           , lwd = 1.3
+           , bty = "n"
+           )
+  }
 }
 ```
 
@@ -369,15 +386,15 @@ plotChain=function(fit,item){
 LSAT6fit=myRunner(getDat(LSAT6),iter=800,mod=m1)
 ```
 
-```{r echo=FALSE,warning=FALSE,message=FALSE,chain,fig.cap="MCMC trace plots for the least autocorrelated (left) and most autocorrelated (right) item parameters."}
+```{r echo=FALSE,warning=FALSE,message=FALSE,chain,fig.cap="MCMC trace plots for the items with the least autocorrelated (left) and most autocorrelated (right) item parameters."}
 par(mfrow=c(1,2),mar=c(4,4,2,1),mgp=c(2,1,0))
-plotChain(LSAT6fit,1)
+plotChain(LSAT6fit,1, leg = T)
 #mtext(side=3,adj=0,line=0,"A.",cex=1.4)
 plotChain(LSAT6fit,3)
 #mtext(side=3,adj=0,line=0,"B.",cex=1.4)
 ```
 
-```{r LSAT6,echo=F,message=F,warnings=F,fig.cap="Results for the LSAT6 data set.  A. Posterior samples from the five distributions.  B. Item response curves derived from posterior means."}
+```{r LSAT6,echo=F,message=F,warnings=F,fig.cap="Results for the LSAT6 data set.  A. Posterior samples from the five distributions.  B. Item response curves derived from posterior means.", fig.asp=.7}
 myPlot(LSAT6fit)
 ```
 
@@ -403,7 +420,7 @@ LSAT7fit=myRunner(getDat(LSAT7),iter=800,mod=m1)
 ```
 
 
-```{r LSAT7, fig.cap="Results for the LSAT7 data set.  A. Posterior samples from the five distributions.  B. Item response curves derived from posterior means.",cache=F,echo=F,message=F,warning=F,results='hide'}
+```{r LSAT7, fig.cap="Results for the LSAT7 data set.  A. Posterior samples from the five distributions.  B. Item response curves derived from posterior means.",cache=F,echo=F,message=F,warning=F,results='hide', fig.asp=.7}
 myPlot(LSAT7fit)
 ```
 
@@ -441,26 +458,26 @@ getsl2=function(){
 m2 <- stan_model(file="2peBin.stan", model_name="2peBin")
 ```
 
-```{r sl2Fitting, cache=T,echo=F,results='hide'}
+```{r sl2Fitting, cache=T,echo=F,results='hide', fig.asp=.7}
 sl2fit=myRunner(getsl2(),iter=800,mod=m2)
 ```
 
 
-```{r sl2Fit,cache=F,echo=F,results='hide'}
+```{r sl2Fit,cache=F,echo=F,results='hide', fig.cap="Results for the digit identification data set.  A. Posterior samples from the six presentation durations. The y-axis is shown in log scale.  B. Item response curves derived from posterior means."}
 myPlotLog(sl2fit)
 ```
 
 # General Discussion
 
-Standard IRT models such as the Rasch model and 2PL make strong substantive commitments about item ordering.  In the Rasch model, all items must order; in 2PL all items must not order.  These commitment, in our view, are not generally applicable and must be assessed on a case by case basis.  For example, in psychophysics,  where items index levels of physical strength, it is reasonable to expect item ordering.  Such an ordering would be in violation of 2PL.  While most psychometricians do not use stimuli that vary on a single, physical dimension, the point remains that psychometric models *should* apply to this case as an important boundary.  Absent from data, it is difficult to justify a commitment to item ordering or to its violation.
+Standard IRT models such as the Rasch model and 2PL make strong substantive commitments about item ordering.  In the Rasch model, all items must order; in 2PL all items must not order.  These commitments, in our view, are not generally applicable and must be assessed on a case by case basis.  For example, in psychophysics,  where items index levels of physical strength, it is reasonable to expect item ordering.  Such an ordering would be in violation of 2PL.  While most psychometricians do not use stimuli that vary on a single, physical dimension, the point remains that psychometric models *should* apply to this case as an important boundary.  Absent from data, it is difficult to justify a commitment to item ordering or to its violation.
 
 We propose a class of IRT links that are flexible with regard to item ordering.  These links allow for item ordering or violations of item ordering depending on the data.  The links use bounded support, and the parameter of support, the shift, along with the scale, form the critical item parameters.  Although we develop a shifted exponential link, other choices have the same flexibility.  Examples include a shifted lognormal with fixed shape or a uniform.  These links are "you can have your cake and eat it" links in that one retains the flexibility of a two-parameter  model without the strong commitment to violations of item ordering.
 
-The downside of the current proposal is statistical.  These models are not very computationally convenient.  The main issue is the weak identifiability of item parameters which is manifest in long ridges in the likelihood.  In this case, the issue is a trade-off between shift and scale.  Logistic, probit, and t-linked models do not have this issue because the support is fixed across items.  Although we find the hybrid Monte Carlo routines in `stan` to be excellent for this application, the problem of weak identifiability remains.  Localizing parameters, and assessing whether item ordering holds is not as of yet straightforward. 
+The downside of the current proposal is statistical.  These models are not very computationally convenient.  The main issue is the weak identifiability of item parameters which is manifest in long ridges in the likelihood.  In this case, the issue is a trade-off between shift and scale.  Logistic, probit, and t-linked models do not have this issue because the support is fixed across items.  Although we find the hybrid Monte Carlo routines in `Stan` to be excellent for this application, the problem of weak identifiability remains.  Localizing parameters, and assessing whether item ordering holds is not as of yet straightforward. 
 
 We ask psychometricians pay heed to a basic, almost minimalist element of psychological content, that is, whether items in a context vary consistently across all people.  More pragmatically, we believe domains should be classified as admitting  item orderings or violating item orderings.  And when they admit a natural ordering, the claim that the items measure a unidimensional latent meaningful psychological construct is all the more stronger.
 
-\newpage
+<!-- \newpage -->
 
 #References
 
