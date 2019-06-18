@@ -1,0 +1,850 @@
+---
+title             : "Do Items Order? The Psychology in IRT Models"
+shorttitle        : "Do Items Order?"
+
+author: 
+  - name          : "Julia M. Haaf"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "Department of Psychology, PO Box 15906, 1001 NK Amsterdam, The Netherlands."
+    email         : "jhaaf@mail.missouri.edu"
+  - name          : "Edgar C. Merkle"
+    affiliation   : "2"
+  - name          : "Jeffrey N. Rouder"
+    affiliation   : "3"
+
+affiliation:
+  - id            : "1"
+    institution   : "University of Amsterdam"
+  - id            : "2"
+    institution   : "University of Missouri"
+  - id            : "3"
+    institution   : "University of California, Irvine"
+
+author_note: |
+    This paper was written using knitr and R Markdown. Using these tools, the text and the code for analysis may be included in a single document.  The document for this paper, with all text and code, may be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe).
+    
+abstract: |
+    Invariant item ordering refers to the statement that if one item is harder than another for one person, then it is harder for all people. Whether item ordering holds is a psychological statement because it describes how people may qualitatively vary. Yet, modern item response theory (IRT) makes an *a priori* commitment to item ordering.  The Rasch model, for example, posits that items must order.  Conversely, the 2PL model posits that items never order. Needed is an IRT model where item ordering or its violation is a function of the data rather than an *a priori* commitment. We develop two-parameter shift-scale models for this purpose, and find that the two-parameter uniform offers many advantages. We show how item ordering may be assessed using Bayes factor model comparison, and discuss computational issues with shift-scale IRT models.
+  
+keywords          : "Item ordering, Item response theory, Cognitive psychometrics"
+
+bibliography      : ["lab.bib"]
+
+header-includes   :
+   - \usepackage{bm}
+   - \usepackage{amsmath}
+   - \usepackage{setspace}
+   - \usepackage{pcl}
+   - \usepackage{marginnote}
+   - \newcommand{\readme}[1]{\emph{\marginnote{Ed} (#1)}}
+
+figsintext        : no
+figurelist        : no
+tablelist         : no
+footnotelist      : no
+lineno            : no
+mask              : false
+
+lang              : "english"
+class             : "man"
+output            : papaja::apa6_pdf
+csl               : apa6.csl
+---
+
+```{r include = FALSE}
+library(papaja)
+library(data.table)
+library(mirt)
+library(rstan)
+library(gamlss.dist)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+rstan_options(auto_write = TRUE)
+set.seed(456)
+```
+
+```{r priors}
+ex=c(-1.5,10,.4,.5)
+uni=c(-1.5,10,1,.5)
+logit=c(0,10,-.2,.5)
+```
+
+Modern psychometrics---the measurement of human abilities, characteristics, and traits---has proven fruitful in many domains including education, cognition, and psychopathology.  One of the key properties of modern psychometrics is that it has taken psychology out of measurement.  For instance, psychometric models do not make assumptions about memory, attention, or the processes that result in differences among individuals.  And rarely are there accounts about why people exhibit specific responses for certain items [cf., @DeBoeck:Wilson:2004].  Instead, models are specified so that they have desirable measurement, statistical, and computational properties. 
+
+In this paper, we offer a stringent critique of modern psychometrics that is in line with Batchelder's notion of *cognitive psychometrics* [e.g., @Batchelder:2010; @Batchelder:Riefer:1990; @Riefer:etal:2002].  We argue that there *is* psychology in psychometrics, and leading models inadvertently make an unwise psychological commitment. This commitment is whether an item affects all people the same way.  We can formalize this notion with the following question: "If Item A is harder than Item B for any one person, then is it at least as hard as Item B for all people?"  Clearly this question has *psychological content*, and whether the answer is affirmative or negative depends on the domain and properties of the items.  Take, for example, psychophysics, where the items might be dim lights of increasing brightness.  Here, we would expect all people to respond at least as accurately on the detection of bright lights as on the detection of dim lights.  But, in some domains and for some items, the answer might be negative.
+
+The above question is known as the question of *invariant item ordering* [@Sijtsma:Junker:1996; @Sijtsma:Hemker:2000]. Item ordering and its violation may be seen by plotting item response curves  (Figure\ \ref{fig:f2pl}).  If two items order, then the item response curve of one dominates (is always greater than or equal to) the response curve of the other.  Items A and B order, with Item A being easier than Item B.  Item C does not order with the other two items.   For example, Item C is harder than Item B for low-ability individuals but it is easier than Item B for high-ability individuals.  Therefore, Items B and C are not consistently easier or harder than one another.  A violation of item ordering occurs when item-response curves cross.
+
+```{r f2pl,echo=FALSE,fig.cap="Item response curves from Model 2PL.  Items have varying location and scale. Items A and B show invariant item ordering, item C violates invariant item ordering when compared to A and B."}
+par(mgp = c(2, .7, 0))
+L=250
+J=3
+p=matrix(nrow=L,ncol=J)
+theta=seq(-4,4,length=L)
+alpha=c(-1,0,1)
+beta=c(1,1,.5)
+for (j in 1:J) p[,j]=plogis((theta-alpha[j])/beta[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black")
+x=alpha
+y=rep(.5,3)
+points(x,y,pch=22,bg="white",cex=3,col="white")
+text(c("A","B","C"),x=x,y=y,cex=1.1)
+```
+
+Ideally, any psychometric model would be *a priori* agnostic as to whether items order.  A good measurement model would have the flexibility to account for item orderings and violations of these orderings, depending on the data obtained.  Unfortunately, the most popular logistic IRT models are not agnostic.  Instead they make *a priori* commitments to item ordering or its violation.
+
+A leading logistic item-response model is the Rasch model [@Rasch:1960].  Here, item response curves are specified to be translations of one another.  Item A and Item B in Figure\ \ref{fig:f2pl} show this translation.  The items only differ in average difficulty. Rasch models are certainly endorsed by some psychometricians on philosophical grounds [@Wright:1977].  Yet, the vast majority of applications use models more richly parameterized than the Rasch model.  The main concern is that the Rasch model's constraint of translated items may be too constraining to provide for an adequate statistical description of the data.  For further distinction between philosophical arguments and statistical arguments for and against the Rasch model, see @Andrich:2004.
+
+The leading logistic item-response model is called the two-parameter logistic, or 2PL.  Two-parameter IRT models, such as 2PL, have an additional parameter, discriminability.  In Figure\ \ref{fig:f2pl}, Items A and B have the same discriminability parameters; Item C has a different discriminability than Items A and B.  One of the main advantages of 2PL is statistical flexibility---items may differ from each other in two distinct ways.  In 2PL, items order only if they have the same discriminability.  The 2PL model therefore enforces item crossings. If two items have different discriminability parameters, then the response curves must cross. This property may strike some as surprising; after all, if two items are far apart in difficulty, it may appear that they do not cross. Nonetheless, as a matter of mathematical fact, the curves must cross even if the crossing occurs at extreme ability values where the curves are very close to floor or ceiling in value. Whereas the Rasch model forces all items to order, 2PL forces at least some items---those with different discriminabilities---to not order.  By choosing between the Rasch model and the 2PL, the analyst makes a content choice that has psychological implications.  Either the analyst forces item orderings or forces their violation.  And, unfortunately, item ordering is not an open question with the answer reflecting structure in the data.
+
+Most modern psychometric applications are as rich as the 2PL in that items have at a minimum unique difficulty and discriminability parameters with continuous support.  And, consequently, in most psychometric applications, it is implicitly stipulated that all items do not order.  
+
+# Psychophysics as an Important Boundary Case
+
+We find it helpful to consider psychophysics as guidance in designing psychometric models.  In psychophysics, we can reasonably assume that stimuli such as light-flashes of varying intensities or tones of varying loudness are one-dimensional. These stimuli serve as items, and, therefore, we can be sure that items are well-ordered.  
+
+@Morey:etal:2008a provides an example.  These researchers asked participants to identify digits that were briefly flashed and subsequently masked.  The presentation duration of the digits was varied in six levels from 16.7 ms to 100 ms.  We treat each of these six levels as an item, and, in this application, we are fortunate to have 90 replicates for each participant-by-item combination.  Because there are replicates, it is possible to visualize response proportions without modeling assumptions.  Figure\ \ref{fig:sl2} shows these proportions for all individuals and items.  The pattern is informative.  Here, item ordering seems plausible inasmuch as the small violations may be due to sample noise.  Moreover, the item-response curves seemingly are not translations of one another, and there is a change of discriminability across the items (Item A discriminates far less between participants than Item F).  Hence, we need a model that may account for item orderings while not forcing item-response curves to be shifts of one another.
+
+```{r sl2,echo=F,fig.cap="Observed accuracy for all individuals and items in masked digit naming.  Items A through F are presentations of 16.7 ms, 25.0ms, 41.7ms, 58.3 ms, 75 ms, and 100 ms.  An accuracy value of .5 serves as an at-chance baseline.  Data are taken from Morey, Pratte, and Rouder (2018), Figure 7."}
+dat=as.matrix(read.table('sl2.dat'))
+J=22
+I=6
+even=seq(2,2*I,2)
+y=(dat[,even-1])
+nn=(dat[,even])
+p=y/nn
+p2 <- p[order(rowMeans(p)),]
+myColors=rainbow(6,alpha=1)
+prestimes <- paste(c(16.7, 25, 41.7, 58.3, 75, 100), "ms")
+matplot(p2,typ='l',lty=1,col=1, lwd = 1.5,
+        ylab="Proportion Correct",xlab="Participant",
+        ylim=c(0,1))
+abline(h=.5,lwd=2,lty=2,col='gray30')
+matpoints(p2,pch=21,bg=myColors,col='black',cex=1.3)
+legend("bottomright", legend = paste0(LETTERS[1:6], " (", prestimes, ")")
+       ,title="Item",pch=21,pt.bg=myColors,bg="white",ncol=3, bty = "n")
+```
+
+In addition to the observed proportions, it seems highly plausible from a theoretical perspective that the six items order.  It is plausible that all people respond at least as well to digits presented for longer durations than for shorter durations.  Indeed, it is hard to conceive of an individual that has better true performance to digits presented say for 16.7 ms than for 41.7 ms.  Therefore, we are concerned that no item-response model is appropriate for psychophysical data.  While the Rasch model captures item orderings, it does not capture the obvious differences in discriminability among the stimulus durations.  It is hard to recommend item-response models in more complicated psychological applications if they miss essential structural properties in areas such as psychophysics where we know much about the items.
+
+In the following, we address this void in psychometrics.  We consider IRT models that are as richly parameterized as 2PL but do not force an *a priori* commitment to item orderings or their violations.  We view these models as respecting the key psychological property of whether items have the same effect on every individual or different effects on different individuals. The models generally follows cognitive psychometric principles, simply stated as "models that have more cognitive content than most standard psychometric models, and yet the models are simple enough to allow detailed statistical analysis" [@Batchelder:1998, p. 341].
+
+# Shift-Scale Links 
+
+To develop our approach, we first highlight the structural and distributional assumptions in 2PL.  The structural property is:  
+\[
+p_{ij} = G\left(\frac{\theta_j-\alpha_i}{\beta_i}\right),
+\]
+where $p_{ij}$ is the probability of a correct response for the $j$th individual on the $i$th item, $i=1,\ldots,I$,  $j=1,\ldots,J$.  The parameter $\theta_j$ is the ability of the $j$th individual; the parameters $\alpha_i$ and $\beta_i$ are respectively the location and scale of the $i$th item.  The function $G$, the link, is monotonically increasing.
+
+In 2PL, the distributional assumption is that $G$ is the logistic link given by $G(x)=1/(1-\exp(-x))$.  In the model, the parameter $\alpha_i$ describes the center of the link and parameter $\beta_i$ describes the scale. This logistic link can be classified as a location-scale link.  An example of the 2PL model is shown by the three items in Figure\ \ref{fig:f2pl}.  The centers are denoted by the letter, and all three items have different centers.  Item A and B have the same scale; Item C has a larger scale.  A violation of invariant item ordering occurs whenever two items have different scale parameters $\beta_i$. Importantly, there is no restriction on $\beta_i$ that allows for item ordering *except* when $\beta_i$, i.e. the discriminability, is the same for all items.
+
+## Exponential Link
+
+The main insight here is that location-scale models with unbounded support, such as 2PL, lead to the critical flaw where scale changes necessarily violate item ordering.  One way of avoiding this problem is to change the link.  Here, we promote *shift-scale* links.  In a shift-scale link, the location parameter serves to shift the bound on support.  One possibility is the exponential link, $G(x)=1-\exp(-x)$ for $x>0$.  With this link the probability of a correct response is
+\[
+p_{ij} = \left\{\begin{array}{cc}
+1-\exp\left(-\frac{\theta_j-\alpha_i}{\beta_i}\right), & \theta_j \geq \alpha_i,\\
+0, & \theta_j < \alpha_i.
+\end{array}\right.
+\]
+
+```{r f2pe,echo=FALSE,fig.cap="Item response curves from shift-scale and unipolar models.  A. Changes in shift with constant scale  preserve item orderings.  B. Changes in scale with constant shift preserve item orderings.  This property is not true for 2PL.  C. Changes in shift and scale preserve item ordering so long as scale increases with shift.  D. When shift increases and scale decreases, item ordering is violated.  E. A uniform link provides an account of item ordering without forcing a relationship between shift and scale. F. The conventional unipolar link violates item ordering.",fig.width=5.5,fig.asp=1.3}
+layout(matrix(1:6, ncol = 2, byrow = T))
+par(mar=c(3,4,1,1),mgp=c(2,.7,0),cex=1)
+
+L=200
+J=4
+p=matrix(nrow=L,ncol=J)
+theta=seq(-4,5,length=L)
+alpha=seq(-3,0,length=J)
+beta=rep(1,J)
+for (j in 1:J) p[,j]=pexp((theta-alpha[j])/beta[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black"
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"A.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+alpha=rep(-2,J)
+beta=c(.5,1,2,4)
+for (j in 1:J) p[,j]=pexp((theta-alpha[j])/beta[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black"
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"B.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+alpha=seq(-2.5,-.5,length=J)
+beta=c(.5,1,2,4)
+for (j in 1:J) p[,j]=pexp((theta-alpha[j])/beta[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black"
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"C.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+alpha=seq(-.5,-2.5,length=J)
+beta=c(.5,1,2,4)
+for (j in 1:J) p[,j]=pexp((theta-alpha[j])/beta[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black"
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"D.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+alpha=seq(-2.5,.5,length=J)
+top=seq(1,2,length=J)
+for (j in 1:J) p[,j]=punif(theta,alpha[j],top[j])
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col="black"
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"E.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+alpha <- rep(c(1, 5), each = 2)
+beta <- seq(.5, 4, length = J)
+for (j in 1:J) {
+  p[,j] <- alpha[j] * theta^beta[j] / (1 + alpha[j] * theta^beta[j])
+  p[theta < 0, j] <- 0
+}
+matplot(theta,p,ty='l',lty=1,lwd=1,
+        xlab="Ability",
+        ylab="Probability Correct",
+        col=1
+        , yaxt = "n")
+mtext(side=3,adj=.05,cex=1.2,"F.",line=-1.2)
+axis(2, seq(0, 1, .5))
+
+```
+
+The model is analogous in some regards to 2PL and parameters $\alpha$ and $\beta$ play the same role as locating and scaling the distribution. The larger the location parameter $\alpha$, the more difficult the item; The smaller the scale parameter $\beta$, the higher discriminability between individuals with different ability.  Figure\ \ref{fig:f2pe} shows a few sets of item response curves from the shifted exponential model. In Panel A, the items differ only in shift, and item response curves are translations of one another.  Item ordering is evident, and the model is analogous to the Rasch model, albeit with a different link.  In Panel B, the items differ only in scale, and again item ordering is evident.  This pattern contrasts with 2PL because in 2PL scale changes necessitate violations of item orderings.  Panel C shows items where shift and scale increase for each successive item achieving item ordering as well.  Panel D shows how violations of item orderings come about in the model---here, increases in shift correspond to decreases in scale. Figure\ \ref{fig:f2pe} shows the desirable flexibility of the 2PE model with respect to item ordering.  Item ordering occurs for two items $i_1$ and $i_2$ if $\alpha_{i_1} > \alpha_{i_2} \iff \beta_{i_1} \geq \beta_{i_2}$.  
+
+We refer to the parameter $\alpha$ as a shift parameter.  Shift parameters are location parameters that also define the bound of support for a distribution.  The key property of the 2PE model is the shift parameter, and in this parameterization, scale increases make items harder for all people.  
+
+## Uniform Link
+
+We also considered the uniform link, which is $G(x)=x$ of $x\in[0,1]$.  With this link,
+\[
+p_{ij} = \left\{\begin{array}{cc}
+0 & \theta_j<\alpha_i\\
+\frac{\theta_j-\alpha_i}{\beta_i}, & \alpha_i \leq \theta_j \leq \alpha_i+\beta_i,\\
+1, & \theta_j > \alpha_i+\beta_i .
+\end{array}\right.
+\]
+Here, the parameter $\alpha$ describes the shift, that is, the lower bound of support, and the parameter $\beta$ describes the scale, or in this case, the width of the uniform.  The upper bound of support is given by $\alpha+\beta$.  Item ordering conditioning again holds for two items if $\alpha_{i_1} > \alpha_{i_2} \iff \alpha_{i_1} + \beta_{i_1} \geq \alpha_{i_2}+\beta_{i_2}$.  
+
+One advantage of the uniform over the exponential is that items need not increase in variance with mean to imply item ordering.  With the exponential, item ordering implies that increases in shift are associated with increases in scale.  Or, restated, as an item becomes more difficult, it becomes less discriminable.
+
+Discriminability and difficulty are better decoupled with the uniform link.  Figure\ \ref{fig:f2pe}E shows an example.  Here invariant item ordering occurs even though the width decreases with the shift, that is, more difficult items have greater discriminability.  Hence, the uniform may be the most flexible two-parameter model---it can describe item orderings and violations of orderings, and item orderings do not force a specific relationship between shift and scale.  This advantage will be consequential in application.
+
+## Unipolar Links
+
+The above shift-scale links are alternatives to the more conventional logistic link.  There are many such alternatives in psychometrics, though, to our knowledge, most of the parametric alternatives are not designed to address the issue of item ordering.  One recent development is the proposal of *unipolar* models where latent abilities are constrained to be positive and where response curves exist on the positive half line [@Lucke:2015;@Ramsay:1989].  Because these model exist on bounded support, they too have the potential to account for both item-ordering and violations of it.  Yet the conventional unipolar model, say that of @Lucke:2015, enforces the violation of item ordering just as 2PL does. The Lucke model is
+
+\[
+p_{ij} = \left\{\begin{array}{cc}
+0 & \theta_j< 0\\
+\frac{\alpha_i\theta_j^{\beta_i}}{1+\alpha_i\theta_j^{\beta_i}}, & \theta_j > 0.
+\end{array}\right.
+\]
+
+Here, any change in $\beta_i$, the shape parameter, across two items necessarily forces a violation of an item ordering. Figure\ \ref{fig:f2pe}F shows an example of this violation. If one were to assess item ordering in a unipolar setup, a more appropriate link than the Lucke model is the cumulative density function of a two-parameter gamma distribution.  The parameters for this distribution are scale and shape.  If either parameter is adjusted while holding the other constant, then the resulting item-response curves order.  Hence, ordering may be achieved two ways (either in scale or shape), and so long as shape and scale increase together, item ordering is guaranteed.  Violations come about when shape decreases with scale.
+
+In the sequel, we develop the shift-scale models discussed above where ability has full support.  We retain three models: the two-parameter logistic (2PL), the two-parameter exponential (2PE), and the two-parameter uniform (2PU). The 2PL merely serves as a comparison for readers familiar with current psychometric models. The 2PE and the 2PU are used to assess item ordering, and they are the target of this analysis.
+
+# Model Specification and Analysis
+
+We find it most convenient to analyze IRT models in the Bayesian framework.  Needed are priors for the collections of $\bftheta$, $\bfalpha$, and $\bfbeta$.  We follow the convention of fixing the mean and standard deviation of people's abilities:
+\[
+\theta_j \stackrel{iid}{\sim} \mbox{Normal}(0,1),
+\]
+where the normal is parameterized with mean and standard deviation.  
+
+The priors for the item parameters are 
+\[
+\begin{aligned}
+\alpha_i &\stackrel{iid}{\sim} \mbox{Normal}(c_1,c_2),\\
+\beta_i &\stackrel{iid}{\sim} \mbox{Log-Normal}(c_3, c_4),\\
+\end{aligned}
+\]
+where the log-normal is parameterized with mean and standard deviation on the log scale.  Constants $(c_1,\ldots,c_4)$ are prior values that need to be set before data analysis.  Our goal in choosing $c_1$ and $c_2$ is to be weakly informative in comparison to person abilities.  For the logistic, we used values of $c_1=0$ and $c_2=10$; for the shift parameters in the exponential and uniform, we used values of $c_1=`r ex[1]`$ and $c_2=`r ex[2]`$. We chose $c_3$ and $c_4$ by picking values that yielded a reasonable range of item-response curves.  Figure \ref{fig:priorCurves} shows this range for the three links and fixed $\alpha$.  For the logistic, $c_3=`r logit[3]`$ and $c_4=`r logit[4]`$; for the exponential,  $c_3=`r ex[3]`$ and $c_4=`r ex[4]`$; for the uniform, $c_3=`r uni[3]`$ and $c_4=`r uni[4]`$. 
+
+```{r priorCurves,fig.cap="Range of response curves resulting from the prior on scale ($\\beta$).  There are 99 faint lines, each for a percentile of the lognormal prior.  Left: Marginal prior response curves for the logistic model with $\\alpha=0$. Center: Marginal prior response curves for the exponential model with $\\alpha=-2$.  Right. Marginal prior response curves for the uniform model with $\\alpha=-2$.",fig.asp=.4, fig.width=7}
+par(mfrow=c(1,3),mar=c(4,3,1,.1),mgp=c(2,.7,0),cex=1)
+
+#Logistic
+theta=seq(-4,5,.1)
+percentile=seq(.01,.99,.01)
+M=length(theta)
+N=length(percentile)
+p=matrix(ncol=N,nrow=M)
+beta=qlnorm(meanlog=logit[3],sdlog=logit[4],p=percentile)
+for (n in 1:N) p[,n]=plogis(theta,0,scale=beta[n])
+plot(theta,p[,1],typ='n',ylim=c(0,1),
+     ylab="Probability Correct",xlab="Ability"
+     , xlim = c(-4, 5)
+     , axes = F)
+for (n in 1:N) lines(theta,p[,n],col=rgb(0,0,0,.1))
+axis(1, seq(-4, 4, 4))
+axis(2, seq(0, 1, .5))
+
+#Exponential
+theta=seq(-4,6,.1)
+M=length(theta)
+p=matrix(ncol=N,nrow=M)
+beta=qlnorm(meanlog=ex[3],sdlog=ex[4],p=percentile)
+for (n in 1:N) p[,n]=pexp(theta+1.5,rate=1/beta[n])
+plot(theta,p[,1],typ='n',ylim=c(0,1),
+     ylab="",xlab="Ability"
+     , xlim = c(-4, 5)
+     , axes = F)
+for (n in 1:N) lines(theta,p[,n],col=rgb(0,0,0,.1))
+axis(1, seq(-4, 4, 4))
+axis(2, seq(0, 1, .5))
+
+# Uniform
+theta=seq(-4,6,.1)
+M=length(theta)
+p=matrix(ncol=N,nrow=M)
+beta=qlnorm(meanlog=uni[3],sdlog=uni[4],p=percentile)
+for (n in 1:N) p[,n]=punif(theta,-2,-2+beta[n])
+plot(theta,p[,1],typ='n',ylim=c(0,1),
+     ylab="",xlab="Ability"
+     , xlim = c(-4, 5)
+     , axes = F)
+for (n in 1:N) lines(theta,p[,n],col=rgb(0,0,0,.1))
+axis(1, seq(-4, 4, 4))
+axis(2, seq(0, 1, .5))
+```
+
+<!--
+The resulting joint posterior for the parameters is:
+\begin{equation}\label{conditional}
+\begin{aligned}
+p(\bftheta,\bfalpha,\bfbeta | \bfY) \propto & \prod_{i}\prod_{j}\big[ 1 - \exp(-(\theta_j - \alpha_i)/\beta_i) \big]^{Y_{ij}} \big[ \exp(-(\theta_j - \alpha_i)/\beta_i) \big]^{1 - Y_{ij}}\\
+& \times \prod_j \phi(\theta_j) \times \prod_i \phi((\alpha_i-c_1)/c_2^{1/2}) \times \prod_i f(\beta_j;c_3,c_4),  
+\end{aligned}
+\end{equation}
+where $\phi$ is the normal density and $f$ is the density on an inverse gamma with shape $c_3$ and scale $c_4$.  
+-->
+
+We initially derived conditional posteriors for each model and implemented a MCMC chain with Metropolis Hasting sampling of each parameter.  Yet, for the shift-scale models, we were unable to achieve good mixing with this approach.  The problem is obvious; the shift and scale parameters are too interdependent.  A large increase in shift and a corresponding decrease in scale results in likelihoods that change little. Even for models with location-scale links like the 2PL, however, correlation between parameters is an issue. One way of obtaining chains that mix well is to use an alternative sampler that better handles ridges in the likelihood.  We developed models based on the `edstan` package [@Furr:2017] using `stan` [@rstan:2018], which employs Hamiltonian sampling [@Neal:2010].  The `R` code is integrated into this manuscript and can be found at [https://github.com/PerceptionAndCognitionLab/irt-2pe](https://github.com/PerceptionAndCognitionLab/irt-2pe). 
+
+# Applications
+
+To assess whether item ordering holds in common IRT applications, we reanalyzed a few readily-available sets from the `mirt` [@Chalmers:2012] and `sirt` [@Robitzsch:2016] packages as well as for the @Morey:etal:2008a data previously presented. 
+
+## LSAT-6 
+
+The classical LSAT-6 data set, from @Thissen:1982, consists of the responses of one-thousand individuals to five dichotomously scored items from the Law School Admissions Test, Section 6.  To examine mixing, we ran a single chain for 800 iterations, the first 200 of which served as a burn-in.  The quality of mixing was assessed by inspection of chains and by the effective samples statistic.  Figure\ \ref{fig:LSAT6Chains} shows the trace plots.  The rows are for the three models; the columns are for the best (left) and worst (right) mixing item parameters.  As can be seen, mixing, while not particularly good, is sufficient.  The effective sample sizes [@Ripley:1979] at worst are 1/10 the nominal values, and obtaining hundreds or thousands of samples is not particularly time consuming.  Hence, posterior distributions may be estimated to a reasonable degree of confidence.
+
+Figure\ \ref{fig:LSAT6}, left column, shows the bivariate posterior samples for all item parameters.  There are five clouds, with one cloud for each item in the set. The bivariate posterior mean for each item is located by the letter. The first row is for the 2PL for comparison.  Here we see that the LSAT6 data set has a limited resolution.  Items A and E are particularly easy (they correspond to accuracies of .92 and .87), and, given this ease, these items yield variable and correlated estimates of difficulty and discriminability across all models.  In fact, given the resolution of the data set, if we were measuring ability, we think the Rasch model would be highly appropriate. Importantly, even though posterior estimates of item scales $\beta$ do not vary by a lot across items, violation of item ordering is necessarily present.
+
+The second and third row show the results for the exponential and uniform links, respectively. If we focus on the exponential link, we see that item ordering may approximately hold. Overall, it seems that Item A has the smallest shift and scale, and the remaining items increase in shift while increasing in scale, with a small violation between items B and C.  A similar pattern holds for the uniform link, and item ordering seems even more plausible here.  The right column shows corresponding item-response curves evaluated at the posterior means.  Here the lack of substantial crossing in the midsection of the curves for all three models bolsters the plausibility of item ordering.
+
+```{r setupModels, cache=T}
+
+m2plC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=0, upper=1> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k] = (theta[jj[k]] - alpha[ii[k]])/beta[ii[k]];
+  y ~ bernoulli_logit(eta);
+}"
+
+m2pl <- stan_model(model_code = m2plC)
+
+m2peC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=0, upper=1> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k] = 1-exp(-fmax((theta[jj[k]]-alpha[ii[k]])/beta[ii[k]], .001));
+  y ~ bernoulli(eta);
+}"
+
+m2pe <- stan_model(model_code = m2peC)
+
+
+m2puC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=0, upper=1> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k]= fmin(fmax((theta[jj[k]]-alpha[ii[k]])/beta[ii[k]], .001),.999);
+  y ~ bernoulli(eta);
+}"
+
+m2pu <- stan_model(model_code = m2puC)
+```
+
+```{r setup, results='hide', cache=T}
+
+getDat=function(setName){
+  dat=as.matrix(expand.table(setName))
+  J=dim(dat)[1]
+  I=dim(dat)[2]
+  jj=rep(1:J,I)
+  ii=rep(1:I,each=J)
+  y=as.vector(dat)
+  N <- I*J 
+  standat <- list(I=I, J=J, ii=ii, jj=jj, N=N, y=y)  
+  return(standat)
+}
+
+getSAT12=function(){
+  correct=c(1, 4, 5, 2, 3, 1, 2, 1, 3, 1, 2, 4, 2, 1, 5, 3, 4, 4, 1, 4, 3, 3, 4, 1, 3, 5, 1, 3, 1, 5, 4)
+  dat=as.matrix(expand.table(SAT12))
+  J=dim(dat)[1]
+  I=dim(dat)[2]
+  jj=rep(1:J,I)
+  ii=rep(1:I,each=J)
+  ans=as.vector(dat)
+  y=as.integer(ans==correct[ii])
+  N <- I*J 
+  standat <- list(I=I, J=J, ii=ii, jj=jj, N=N, y=y)  
+  return(standat)
+}
+
+
+
+myRunner=function(standat,iter=400,warmup=200,mod,prior, ...){
+  standat$c=prior
+  inits <- list(beta=rep(1, standat$I), alpha=rep(0, standat$I), theta=rep(0, standat$J))
+  inits <- list(c1=inits)
+  fit <- sampling(mod, verbose=F,
+                  data=standat, 
+                  iter=iter,
+                  warmup=warmup,
+                  chains=1,
+                  init=inits,
+                  pars=c("alpha", "beta", "theta")
+                  , ...)
+  return(fit)}
+```
+
+```{r plotFunctions,echo=FALSE,warning=FALSE,message=FALSE}
+
+myBivariate=function(fit, c.alpha=.2, cex=.7, uni=F, ol = 4, xaxt = T, ...){
+  myVals=c(1,2,5,10,20,50)
+  myTicks=c(1:50)
+  vals=as.matrix(fit)
+  a=vals[,colnames(vals) %like% "alpha"]
+  b=vals[,colnames(vals) %like% "beta"]
+  b1=b+a
+  myColors=rainbow(dim(a)[2],alpha=c.alpha)
+  b0=b
+  if (uni) b0=b1
+  matplot(a, b0, pch=19, col=myColors, cex=cex, axes = F,...)
+  yb <- round(range(b0))
+  if(xaxt == T) axis(1)
+  axis(2, seq(yb[1], yb[2], length.out = ol))
+  box()
+  points(colMeans(a), colMeans(b0), pch=LETTERS[1:dim(a)[2]], cex=1.1)
+  return(cbind(colMeans(a),colMeans(b)))
+}
+
+myExp=function(z,a,b) pexp(z-a,rate=1/b)
+myUni=function(z,a,b) punif(z,a,a+b)
+myLogis=function(z,a,b) plogis(z,a,b)
+
+myHalfExp=function(z,a,b) .5 + .5*myExp(z,a,b)
+myHalfUni=function(z,a,b) .5 + .5*myUni(z,a,b)
+myHalfLogis=function(z,a,b) .5 + .5*myLogis(z,a,b)
+
+myRF=function(m,link){
+  I=dim(m)[1]
+  newcols <- rainbow(I)
+  z=seq(-10,10,.01)
+  p=matrix(nrow=I,ncol=length(z))
+  for (i in 1:I) p[i,]=link(z,m[i,1],m[i,2])
+  matplot(z, t(p)
+          , typ='l', col=newcols
+          , lty=1, lwd=2
+          , yaxt = "n"
+          , ylab="Probability Correct", xlab="Ability"
+          , ylim = c(0, 1))
+  axis(2, seq(0, 1, .5))
+}
+```
+
+```{r plotChainFunction,echo=FALSE,warning=FALSE,message=FALSE}
+plotChain <- function(fit,item, leg = F,yrange=c(-10,10),text=""){
+  vals=as.matrix(fit)
+  a=vals[,colnames(vals) %like% "alpha"]
+  b=vals[,colnames(vals) %like% "beta"]
+  matplot(cbind(a[,item],b[,item]),ylim=yrange
+          ,typ='l',lty=1:2,col='black'
+          ,xlab="Iteration",ylab="Value", axes=F)
+  axis(1, at = c(0,600))
+  axis(2,at=yrange)
+  if(leg == T){
+    legend("topright"
+           , legend = c(expression("Location/Shift" ~ alpha)
+                        , expression("Scale" ~ beta))
+           , lty = 1:2
+           , lwd = 1.3
+           , bty = "n"
+           )
+  }
+  mtext(side=2,adj=.5,text,cex=1.3, line = 2.5)
+}
+```
+
+```{r LSAT6run,cache=TRUE,echo=FALSE,warning=FALSE,message=FALSE,results='hide'}
+LSAT6fitLogit=myRunner(getDat(LSAT6),iter=800,mod=m2pl,prior=logit)
+LSAT6fitEx=myRunner(getDat(LSAT6),iter=800,mod=m2pe,prior=ex)
+LSAT6fitUni=myRunner(getDat(LSAT6),iter=800,mod=m2pu,prior=uni)
+
+```
+
+```{r LSAT6Chains,echo=FALSE,warning=FALSE,message=FALSE,fig.cap="MCMC trace plots for the items with the most autocorrelation (left) and the least autocorrelated (right) chains.  ",fig.asp=1.3, fig.width=5.5, cache = T}
+layout(matrix(1:6, ncol = 2, byrow = T))
+par(mar=c(3,3.5,.5,.5),mgp=c(1,1,0),cex=1)
+
+plotChain(LSAT6fitLogit, 1, leg = F, yrange=c(-7,9), text="Logistic")
+plotChain(LSAT6fitLogit, 3, yrange=c(-7,9), text=" ", leg = T)
+plotChain(LSAT6fitEx, 1, leg = F, yrange=c(-10,5), text="Exponential")
+plotChain(LSAT6fitEx, 3, yrange=c(-10,5), text=" ", leg = F)
+plotChain(LSAT6fitUni, 1, leg = F, yrange=c(-13,13), text="Uniform")
+plotChain(LSAT6fitUni, 3, yrange=c(-13,13), text=" ")
+```
+
+```{r LSAT6,fig.cap="Results for the LSAT-6 data set. The first column shows the bivariate posterior distributions of item parameters for the five questions. The second column shows the item response curves evaluated at the posterior means. Rows show results for the logistic, exponential, and uniform models, respectively.",fig.width=5.5,fig.asp=1.5}
+par(mfrow=c(3,2),mar=c(3,3,.5,.5),mgp=c(1.8,.7,0),cex=1)
+m=myBivariate(LSAT6fitLogit,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Location ',alpha))
+          , xaxt = F
+          , ol = 3)
+axis(1, seq(-6, 0, 2))
+myRF(m,myLogis)
+m=myBivariate(LSAT6fitEx,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Shift ',alpha))    
+          , ol = 5, xaxt = F)
+axis(1, seq(-9, -2, 3))
+myRF(m,myExp)
+m=myBivariate(LSAT6fitUni,uni=T,
+          ylab=expression(paste('Upper Bound ',alpha+beta)),
+          xlab=expression(paste('Lower Bound ',alpha))    
+          , ol = 5)
+myRF(m,myUni)
+```
+
+## LSAT-7
+
+The LSAT-7 data set, from @Bock:Lieberman:1970, consists of the response of one-thousand individuals to five dichotomously scored items from the Law School Admissions Test, Section 7. Figure\ \ref{fig:LSAT7}A shows the bivariate posterior samples for all item parameters for the logistic, exponential, and uniform models.  There are five clouds, with one for each item in the set. For both the exponential and the uniform link we see a clear violation of item ordering.  Consider Items E and C; Item E has a smaller shift but larger scale than Item C.  The violation of ordering is also prominent in the right column of Figure\ \ref{fig:LSAT7}, which shows the derived item response curves at posterior mean values. 
+
+The seeming item ordering for the LSAT-6 and the violation of item ordering for LSAT-7 are easily explained. For the LSAT-6 items, test-takers had to identify a figure that could be classified as belonging to one of two groups of figures, and this skill appears to be relatively homogeneous [@Bock:Lieberman:1970]. For the LSAT-7 items, test-takers had to classify statements as supporting or rejecting a resolution, and the items were quite heterogeneous [@Bock:Lieberman:1970].
+
+```{r LSAT7fit, cache = T,message=F,warning=F,results='hide'}
+LSAT7fitLogit=myRunner(getDat(LSAT7),iter=800,mod=m2pl,prior=logit)
+LSAT7fitEx=myRunner(getDat(LSAT7),iter=800,mod=m2pe,prior=ex)
+LSAT7fitUni=myRunner(getDat(LSAT7),iter=800,mod=m2pu,prior=uni)
+```
+
+```{r LSAT7, fig.cap="Results for the LSAT-7 data set. The first column shows the bivariate posterior distributions of item parameters for the five questions. The second column shows the item response curves evaluated at the posterior means. Rows show results for the exponential and uniform models, respectively.",fig.width=5.5,fig.height = 8}
+par(mfrow=c(3,2),mar=c(3,3,.5,.5),mgp=c(1.8,.7,0),cex=1)
+m=myBivariate(LSAT7fitLogit,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Location ',alpha))
+          , ol = 3
+          )
+myRF(m,myLogis)
+m=myBivariate(LSAT7fitEx,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Shift ',alpha))    
+          , xaxt = F)
+axis(1, seq(-7, -2, 2))
+myRF(m,myExp)
+m=myBivariate(LSAT7fitUni,uni=T,
+          ylab=expression(paste('Upper Bound ',alpha+beta)),
+          xlab=expression(paste('Lower Bound ',alpha))    
+          , ol = 3
+          , xaxt = F)
+axis(1, seq(-12, -2, 3))
+myRF(m,myUni)
+```
+
+## Masked Digit Identification
+
+One domain in which it is highly plausible that item ordering holds is psychophysics.  Previously, we treated stimulus duration as an item variable, and it seems inconceivable that anyone is truly better at identifying stimuli presented at shorter than at longer durations.  We reanalyzed the accuracy data in Figure\ \ref{fig:sl2} from @Morey:etal:2008a with modified 2PE and 2PU models.  The modified 2PE model is: 
+\[
+\begin{aligned}
+Y_{ij} &\sim \mbox{Binomial}(p_{ij},N_{ij}),\\
+p_{ij} &= \frac{1}{2}+\frac{1}{2}\left(1-\exp\left[-\frac{\theta_j-\alpha_i}{\beta_i}\right]\right).
+\end{aligned}
+\]
+The main modification here is a baseline accuracy of .5 rather than zero.  In Morey et al.'s experiment, half the digits were less-than-five and half were greater-than-five.  Individuals had to choose among these two alternatives.  With this experimental setup, individuals unable to identify the stimulus at all have a 50\% chance of correct response.  The analogous modification was made for the 2PL and the 2PU models.
+
+```{r setupBinModels, cache=T}
+mBin2plC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=1> nn[N]; // num trials for k
+  int<lower=0> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k] = .5 + .5 / (1 + exp( -(theta[jj[k]] - alpha[ii[k]])/beta[ii[k]]));
+  y ~ binomial(nn, eta);
+}"
+
+mBin2pl <- stan_model(model_code = mBin2plC)
+
+mBin2peC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=1> nn[N]; // num trials for k
+  int<lower=0> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k] = .5+.5*(1 - exp(-fmax((theta[jj[k]] - alpha[ii[k]])/beta[ii[k]], .001)));
+  y ~  binomial(nn, eta);
+}"
+
+mBin2pe <- stan_model(model_code = mBin2peC)
+
+
+mBin2puC <- "
+data {
+  int<lower=1> I;               // # questions
+  int<lower=1> J;               // # persons
+  int<lower=1> N;               // # observations
+  int<lower=1, upper=I> ii[N];  // question for k
+  int<lower=1, upper=J> jj[N];  // person for k
+  int<lower=1> nn[N]; // num trials for k
+  int<lower=0> y[N];   // correctness for k
+  real c[4];                  // prior settings
+}
+
+
+parameters {
+  vector<lower=0>[I] beta;
+  vector[I] alpha;
+  vector[J] theta;
+}
+
+model {
+  vector[N] eta;        
+  alpha ~ normal(c[1], c[2]); // parameterized as SD
+  beta ~ lognormal(c[3], c[4]);
+  theta ~ normal(0, 1);
+  for (k in 1:N)
+    eta[k]= .5+.5*fmin(fmax((theta[jj[k]]-alpha[ii[k]])/beta[ii[k]], .001),.999);
+  y ~ binomial(nn,eta);
+}"
+
+mBin2pu <- stan_model(model_code = mBin2puC)
+```
+
+The results of the analysis are shown in Figure\ \ref{fig:sl2Plot}.  Unlike the previous examples, the pattern of parameter estimates (left column) is very much dependent on the model, and the differences are informative.  Consider first the exponential model.  Here, there is a pronounced nonmonotonicity.  The easiest four items, Items C through F, order strongly and are notably different in scale.  The hardest two items, Items A (16.7 ms) and B (25 ms), however, order in reverse.  The reason for this reverse ordering is more of a statistical issue than any statement about the items.  Items A and B correspond to the shortest stimulus durations, and inspection of Figure\ \ref{fig:sl2Plot} reveals that it is highly likely that none of the individuals could identify any of the targets above baseline.  In this case, there is no information from the performance data other than the shift is quite high.  The scale, in particular, reflects only the prior settings, which are lower in value than the data-driven value for Item C.  The posterior on scale reflects the prior to a greater and greater degree, that is, for harder items, the scale estimates may actually decrease in value depending on the prior settings. We have confirmed this excessive dependency for hard items by trying various values of priors, and they do have the described effect. 
+
+This behavior is not unique to the 2PE.  In any two-parameter location-scale IRT model, including 2PL, if all participants perform near baseline on an item, it is very difficult to estimate scale values. This can be seen in the first row for Figure\ \ref{fig:sl2Plot}. Posterior samples for item A are extremely spread and mainly reflects the prior. 
+
+The pattern for the uniform model, however, is different.  Here, the items order!  The difference occurs because the uniform model does not require increasing scale with shift for item ordering.  Certainly, the estimates of the scale parameter, in this case the width of the uniform, regress to the prior for the hard items.  Yet, this regression does not translate into a violation of item orderings. In fact, the width of the uniform for item A is the lowest of all items. Yet, the items still order because the shift is much bigger.
+
+Based on this behavior, we think the uniform link is preferable to the exponential link.  Here is a case where requiring decreased discriminability with increased difficulty makes no sense.  By using the uniform link rather than the exponential, we can meet the benchmark requirement that physical stimuli order even in the case of extreme levels of performance.
+
+```{r,echo=FALSE,warnings=FALSE,results='hide',cache=T}
+getsl2=function(){
+  dat=as.matrix(read.table('sl2.dat'))
+  J=22
+  I=6
+  N <- I*J 
+  jj=rep(1:J,I)
+  ii=rep(1:I,each=J)
+  even=seq(2,2*I,2)
+  y=as.vector(dat[,even-1])
+  nn=as.vector(dat[,even])
+  standat <- list(I=I, J=J, ii=ii, jj=jj, N=N, y=y, nn=nn)  
+  return(standat)
+}
+```
+
+```{r sl2Fit, cache=T,results='hide'}
+sl2fitLogit=myRunner(getsl2(),iter=800,mod=mBin2pl,prior=logit, control = list(adapt_delta = .9))
+sl2fitEx=myRunner(getsl2(),iter=800,mod=mBin2pe,prior=ex, control = list(max_treedepth = 15, adapt_delta = .9))
+sl2fitUni=myRunner(getsl2(),iter=800,mod=mBin2pu,prior=uni, control = list(max_treedepth = 15, adapt_delta = .9))
+```
+
+```{r sl2Plot, fig.cap="Results for the masked identification data set. The first column shows the bivariate posterior distributions of item parameters for the six durations. The second column shows the item response curves evaluated at the posterior means. Rows show results for the exponential and uniform models, respectively.",fig.width=5.5,fig.height = 8}
+par(mfrow=c(3,2),mar=c(3,3,.5,.5),mgp=c(1.8,.7,0),cex=1)
+m=myBivariate(sl2fitLogit,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Location ',alpha))
+          , ol = 6
+          , xaxt = F)
+axis(1, seq(0, 30, 10))
+myRF(m,myHalfLogis)
+m=myBivariate(sl2fitEx,
+          ylab=expression(paste('Scale ',beta)),
+          xlab=expression(paste('Shift ',alpha))
+          , ol = 3
+          , xaxt = F)
+axis(1, seq(0, 30, 10))
+myRF(m,myHalfExp)
+m=myBivariate(sl2fitUni,uni=T,
+          ylab=expression(paste('Upper Bound ',alpha+beta)),
+          xlab=expression(paste('Lower Bound ',alpha))    
+          , ol = 3
+          , xaxt = F)
+axis(1, seq(-5, 25, 10))
+myRF(m,myHalfUni)
+```
+
+```{r BF}
+makeBFuni=function(fit){
+  vals=as.matrix(fit)
+  a=vals[,colnames(vals) %like% "alpha"]
+  b=vals[,colnames(vals) %like% "beta"]
+  top=a+b
+  I=dim(a)[1]
+  q=1:I
+  for (i in 1:I)
+    q[i]=mean(order(a[i,])==order(top[i,]))==1
+  p0=(1/factorial(dim(a)[2]))
+  p1=mean(q)
+  return(p1*(1-p0)/((1-p1)*p0))
+}
+```
+
+# Bayes Factor Assessment of Orderings
+
+The two-parameter uniform performs well in the three applications.  In particular, it remains agnostic to whether items order or not.  Moreover, the model may be used to formally state the strength of evidence from data for invariant item ordering.  Here is how:
+
+We follow @Klugkist:etal:2005 in using a counting-based approach to compute the Bayes factor.  Before the data are observed, the probability that any $I$ items will order is $(I!)^{-1}$.  Hence, the prior odds that items order is
+\[
+R_0 = \frac{(I!)^{-1}}{1-(I!)^{-1}}
+\]
+
+The posterior probability that the item orders may be computed in the MCMC chain by simply counting how many iterations the ordering of shape estimates matches the ordering of the scale estimates.  Let $\bfalpha^{[m]}=(\alpha_1^{[m]},\ldots,\alpha_I^{[m]})$ be the I-dimensional vector of shift parameters on the $m$th iteration.  Likewise, let $\bfbeta^{[m]}$ be the vector of scale parameters, and let $\bfgamma^{[m]}=(\alpha_1^{[m]}+\beta_1^{[m]},\ldots,\alpha_I^{[m])}+\beta_I^{[m]})$ be the vector of the upper bound of the uniform on the $m$th iteration.  Let $O(\bfalpha^{[m]})$ and $O(\bfgamma^{[m]})$ be the rank orders of the lower and upper bounds, respectively, and let $T^{[m]}=1$ if these orders are equal and $T^{[m]}=0$ otherwise.  Then, the posterior probability that the items order is simply the average of $\bfT$, $\bar{T} = \sum_m T^{[m]}/M$, where $M$ is the number of iterations in the chain.  The posterior odds is therefore
+\[
+R_1=\frac{\bar{T}}{1-\bar{T}}.
+\]
+The Bayes factor is simply the ratio $R_1/R_0$.
+
+We evaluated the Bayes factor for the three applications.  For SAT6 and masked identification, the applications where item ordering seems plausible, the Bayes factors were `r round(makeBFuni(LSAT6fitUni),1)`-to-1 and `r round(makeBFuni(sl2fitUni),0)`-to-1, respectively.  For the SAT7, where item ordering is obviously violated, we did not sample an iteration where the orders matched.  Hence, to get an upper bound on the Bayes factor, we can assume there would be a match on the $M+1$ iteration, and doing so yields an upper bound of about `r round((1/601)*factorial(5),2)`-to-1.  The odds that the order is violated is at least 5-to-1 and likely much, much greater.  Gaining a more accurate estimate is just a matter of increasing the number of iterations.
+
+The above counting approach works well only for a small number of items.  It scales exceedingly poorly with increasing number of items as the number of iterations must keep up with the factorial function.  Whether there are feasible alternative computational approaches for large item sets is to our knowledge unknown and remains outside the scope of this paper.
+
+# General Discussion
+
+Standard IRT models such as the Rasch model and 2PL make strong substantive commitments about item ordering.  In the Rasch model all items must order; in 2PL all items must not order.  These commitments, in our view, are not generally applicable and must be assessed on a case by case basis.  For example, in psychophysics,  where items index levels of physical strength, it is reasonable to expect item ordering.  Such an ordering would be in violation of 2PL.  While most psychometricians do not use stimuli that vary on a single, physical dimension, the point remains that psychometric models *should* apply to this case as an important boundary.  Absent from data, it is difficult to justify a commitment to item ordering or to its violation.
+
+We propose a class of IRT links that are flexible with regard to item ordering.  These links allow for item ordering or violations of item ordering depending on the data.  The links use bounded support, and in particular the uniform, a link with lower and upper bounds performs well in practice.  These links are "you can have your cake and eat it" links in that one retains the flexibility of a two-parameter model without the strong commitment to violations of item ordering.
+
+We ask psychometricians pay heed to a basic, almost minimalist element of psychological content, that is, whether items in a context vary consistently across all people.  More pragmatically, we believe domains should be classified as admitting item orderings or violating item orderings.  And when they admit a natural ordering, the claim that the items measure a unidimensional latent meaningful psychological construct is much stronger.
+
+\newpage
+
+# References
+

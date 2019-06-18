@@ -1,0 +1,56 @@
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/f2pl-1.pdf}
+\caption{\label{fig:f2pl}Item response curves from Model 2PL. Items have varying location and scale. Items A and B show invariant item ordering, item C violates invariant item ordering when compared to A and B.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/sl2-1.pdf}
+\caption{\label{fig:sl2}Observed accuracy for all individuals and items in masked digit naming. Items A through F are presentations of 16.7 ms, 25.0ms, 41.7ms, 58.3 ms, 75 ms, and 100 ms. An accuracy value of .5 serves as an at-chance baseline. Data are taken from Morey, Pratte, and Rouder (2018), Figure 7.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/f2pe-1.pdf}
+\caption{\label{fig:f2pe}Item response curves from shift-scale and unipolar models. A. Changes in shift with constant scale preserve item orderings. B. Changes in scale with constant shift preserve item orderings. This property is not true for 2PL. C. Changes in shift and scale preserve item ordering so long as scale increases with shift. D. When shift increases and scale decreases, item ordering is violated. E. A uniform link provides an account of item ordering without forcing a relationship between shift and scale. F. The conventional unipolar link violates item ordering.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/priorCurves-1.pdf}
+\caption{\label{fig:priorCurves}Range of response curves resulting from the prior on scale (\(\beta\)). There are 99 faint lines, each for a percentile of the lognormal prior. Left: Marginal prior response curves for the logistic model with \(\alpha=0\). Center: Marginal prior response curves for the exponential model with \(\alpha=-2\). Right. Marginal prior response curves for the uniform model with \(\alpha=-2\).}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/LSAT6Chains-1.pdf}
+\caption{\label{fig:LSAT6Chains}MCMC trace plots for the items with the most autocorrelation (left) and the least autocorrelated (right) chains.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/LSAT6-1.pdf}
+\caption{\label{fig:LSAT6}Results for the LSAT-6 data set. The first column shows the bivariate posterior distributions of item parameters for the five questions. The second column shows the item response curves evaluated at the posterior means. Rows show results for the logistic, exponential, and uniform models, respectively.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/LSAT7-1.pdf}
+\caption{\label{fig:LSAT7}Results for the LSAT-7 data set. The first column shows the bivariate posterior distributions of item parameters for the five questions. The second column shows the item response curves evaluated at the posterior means. Rows show results for the exponential and uniform models, respectively.}
+\end{figure*}
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{p_files/figure-latex/sl2Plot-1.pdf}
+\caption{\label{fig:sl2Plot}Results for the masked identification data set. The first column shows the bivariate posterior distributions of item parameters for the six durations. The second column shows the item response curves evaluated at the posterior means. Rows show results for the exponential and uniform models, respectively.}
+\end{figure*}
